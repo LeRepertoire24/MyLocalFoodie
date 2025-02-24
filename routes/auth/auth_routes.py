@@ -1,6 +1,6 @@
-# ------------------------------------------------------------
-# routes/auth_routes.py
-# ------------------------------------------------------------
+# ------------------------------------------------------------#
+#                   routes/auth/auth_routes.py                #
+# ------------------------------------------------------------#
 from flask import Blueprint, request, jsonify, current_app, g, session
 from functools import wraps
 import bcrypt
