@@ -1,5 +1,5 @@
 #----------------------------------------------------------# 
-#----        routes/permission_manager.py      ------------#
+#----        routes/auth/permission_manager.py      -------#
 #----------------------------------------------------------#
 from flask import Blueprint, request, jsonify, current_app, g, session
 from pymongo import MongoClient
