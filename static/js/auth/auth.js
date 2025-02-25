@@ -1,4 +1,6 @@
-// static/js/auth/auth.js
+//-------------------------------------//
+//       static/js/auth/auth.js        //
+//-------------------------------------//
 
 document.addEventListener("DOMContentLoaded", () => {
   const loginForm = document.getElementById("login-form");
@@ -14,18 +16,24 @@ document.addEventListener("DOMContentLoaded", () => {
     const passwordValid = passwordInput.value.trim().length >= 8;
     loginButton.disabled = !(payrollIdValid && passwordValid);
   };
-
-  // Validate on input
+  
+  //--------------------------------------//
+  //          Validate on input           //
+  //--------------------------------------//
   payrollIdInput.addEventListener("input", validateForm);
   passwordInput.addEventListener("input", validateForm);
-
-  // Handle submit
+  
+  //--------------------------------------//
+  //              Handle submit          //
+  //--------------------------------------//
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     loginErrorsContainer.classList.add("hidden");
     loginErrors.textContent = "";
-
-    // Show loading overlay (optional)
+    
+    //------------------------------------------//
+    //      Show loading overlay (optional)     //
+    //------------------------------------------//
     showLoadingOverlay(true);
 
     try {
