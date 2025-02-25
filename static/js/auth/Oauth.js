@@ -1,5 +1,5 @@
 //--------------------------------------//
-//       static/js/auth/index.js        //
+//       static/js/auth/Oauth.js        //
 //--------------------------------------//
 
 // Utility to check if the user is authenticated
