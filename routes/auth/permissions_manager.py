@@ -1,6 +1,6 @@
-#----------------------------------------------------------# 
-#----        routes/auth/permission_manager.py      -------#
-#----------------------------------------------------------#
+# ------------------------------------------------------------
+#----        routes/auth/permission_manager.py      -------
+# ------------------------------------------------------------
 from flask import Blueprint, request, jsonify, current_app, g, session
 from pymongo import MongoClient
 from config import Config
@@ -85,7 +85,7 @@ def require_permission(permission_name, venue_id=None):
                 return jsonify({"success": False, "error": "Incomplete user context"}), 401
 
             db = current_app.config['MONGO_CLIENT'][Config.MONGO_DBNAME]
-            # Retrieve the user assignment (from business_users collection)
+            # Retrieve the user assignment from business_users collection
             user_doc = find_user_in_business(db, payroll_id, business_id)
             if not user_doc:
                 return jsonify({"success": False, "error": "User not assigned to business"}), 403
@@ -260,6 +260,7 @@ __all__ = [
 if __name__ == "__main__":
     # For local testing only
     from flask import Flask
+    from pymongo import MongoClient
     app = Flask(__name__)
     app.config['MONGO_CLIENT'] = MongoClient(Config.MONGO_URI)
     app.register_blueprint(permission_manager)
