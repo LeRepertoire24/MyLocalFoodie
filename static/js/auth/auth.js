@@ -1,4 +1,4 @@
-// app/static/js/auth.js
+// static/js/auth/auth.js
 
 document.addEventListener("DOMContentLoaded", () => {
   const loginForm = document.getElementById("login-form");
