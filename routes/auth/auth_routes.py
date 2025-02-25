@@ -1,19 +1,25 @@
-# ------------------------------------------------------------#
-#                   routes/auth/auth_routes.py                #
-# ------------------------------------------------------------#
+# ------------------------------------------------------------
+#                   routes/auth/auth_routes.py
+# ------------------------------------------------------------
 from flask import Blueprint, request, jsonify, current_app, g, session
 from functools import wraps
-import bcrypt
 import jwt
 from datetime import datetime, timedelta
 import logging
 
+# Import additional utilities (preserved from original)
 from utils.validation_utils import validate_request_data
 from utils.security_utils import generate_random_string
 from utils.google_utils import validate_google_token, get_google_service
 from utils.business_utils import lookup_business
 from utils.time_utils import generate_timestamp
 from utils.rate_limiter import RateLimiter
+
+# Import our updated authentication utilities
+from utils.auth.auth_utils import validate_payroll_id, check_password
+
+# Import AuditLogger for audit events
+from utils.audit_logger import AuditLogger
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +39,23 @@ class AuthError(Exception):
         self.status_code = status_code
 
 def create_session_token(user):
-    """Create a JWT token containing essential user data"""
+    """
+    Create a JWT token containing essential user data.
+    Uses the updated user document structure:
+      - payroll_id: stored at top-level
+      - work_email: stored as 'work_email'
+      - role: stored at top-level
+      - business_id: stored as 'company_id'
+      - venue_id: stored at top-level
+      - work_area_id: stored at top-level
+    """
     try:
         payload = {
-            'payroll_id': user['pay_details']['payroll_id'],
-            'email_work': user['pay_details']['email_work'],
+            'payroll_id': user['payroll_id'],
+            'email_work': user['work_email'],
             'role': user['role'],
-            'business_id': user['linked']['business_id'],
-            'venue_id': user['linked']['venue_id'],
+            'business_id': user['company_id'],
+            'venue_id': user['venue_id'],
             'work_area_id': user['work_area_id'],
             'exp': datetime.utcnow() + timedelta(hours=8),
             'iat': datetime.utcnow()
@@ -55,7 +70,9 @@ def create_session_token(user):
         raise AuthError("Failed to create authentication token")
 
 def verify_token(token):
-    """Verify and decode JWT token"""
+    """
+    Verify and decode JWT token.
+    """
     try:
         return jwt.decode(
             token, 
@@ -68,7 +85,12 @@ def verify_token(token):
         raise AuthError("Invalid token")
 
 def login_required(f):
-    """Decorator to protect routes requiring authentication"""
+    """
+    Decorator to protect routes requiring authentication.
+    Checks the Authorization header for a valid JWT token,
+    verifies that the user exists and is active, and populates
+    Flask's global 'g' with token payload and full user document.
+    """
     @wraps(f)
     def decorated_function(*args, **kwargs):
         try:
@@ -79,9 +101,9 @@ def login_required(f):
             token = auth_header.replace('Bearer ', '')
             payload = verify_token(token)
             
-            # Verify user still exists and is active
+            # Verify that the user exists and is active using updated fields
             user = current_app.mongo.db.business_users.find_one({
-                "pay_details.payroll_id": payload['payroll_id'],
+                "payroll_id": payload['payroll_id'],
                 "status": {"$ne": "inactive"}
             })
             
@@ -89,7 +111,7 @@ def login_required(f):
                 raise AuthError("User account is no longer active")
             
             g.user = payload
-            g.current_user = user  # Store full user object for route handlers
+            g.current_user = user  # Store full user document for route handlers
             return f(*args, **kwargs)
             
         except AuthError as e:
@@ -108,7 +130,27 @@ def login_required(f):
 
 @auth.route("/auth/login", methods=['POST'])
 def login():
-    """Handle user login with payroll ID and password"""
+    """
+    Handle user login with payroll ID and password.
+    
+    Expected JSON payload:
+      {
+         "payroll_id": "D{work_area_letter}-XXXXXX",
+         "password": "<plaintext_password>"
+      }
+    
+    Features:
+      - Validates required fields.
+      - Applies rate limiting to mitigate brute-force attacks.
+      - Validates the payroll ID format using the updated function.
+      - Retrieves the user from 'business_users' collection.
+      - Verifies the plaintext password against the stored hash.
+      - Clears rate limiting on successful login.
+      - Creates a JWT token containing essential user data.
+      - Updates the last login timestamp.
+      - Logs the successful login event.
+      - Returns the token and a subset of user data.
+    """
     try:
         data = request.get_json()
         payroll_id = data.get('payroll_id')
@@ -129,17 +171,17 @@ def login():
                 "message": "Too many failed attempts. Please try again later."
             }), 429
 
-        # Validate payroll ID format
-        if not payroll_id.startswith('USR-') or len(payroll_id) != 12:
+        # Validate payroll ID format using the updated function
+        if not validate_payroll_id(payroll_id):
             login_limiter.record_attempt(payroll_id, success=False)
             return jsonify({
                 "success": False,
                 "message": "Invalid payroll ID format"
             }), 400
 
-        # Find user in MongoDB
+        # Find user in MongoDB using the updated document structure
         user = current_app.mongo.db.business_users.find_one({
-            "pay_details.payroll_id": payroll_id,
+            "payroll_id": payroll_id,
             "status": {"$ne": "inactive"}
         })
 
@@ -151,11 +193,8 @@ def login():
                 "message": "Invalid payroll ID or password"
             }), 401
 
-        # Verify password
-        if not bcrypt.checkpw(
-            password.encode('utf-8'), 
-            user['pay_details']['password'].encode('utf-8')
-        ):
+        # Verify password using the imported utility function
+        if not check_password(user['password'], password):
             login_limiter.record_attempt(payroll_id, success=False)
             logger.warning(f"Failed login attempt for payroll ID: {payroll_id}")
             return jsonify({
@@ -166,7 +205,7 @@ def login():
         # Clear rate limiting on successful login
         login_limiter.clear_attempts(payroll_id)
 
-        # Create session token
+        # Create session token (JWT)
         token = create_session_token(user)
 
         # Update last login timestamp
@@ -183,23 +222,21 @@ def login():
         AuditLogger.log_event(
             'user_login',
             payroll_id,
-            user['linked']['business_id'],
+            user.get('company_id', 'N/A'),
             'Successful login',
             ip_address=request.remote_addr
         )
 
         # Prepare user data for response
         user_data = {
-            "payroll_id": user['pay_details']['payroll_id'],
-            "email_work": user['pay_details']['email_work'],
-            "name_first": user['name_first'],
-            "name_preferred": user.get('name_preferred'),
+            "payroll_id": user['payroll_id'],
+            "email_work": user['work_email'],
+            "name_first": user['first_name'],
+            "name_preferred": user.get('preferred_name'),
             "role": user['role'],
-            "permissions": user['permissions'],
-            "linked": {
-                "business_id": user['linked']['business_id'],
-                "venue_id": user['linked']['venue_id']
-            },
+            "permissions": user.get('permissions', []),
+            "business_id": user['company_id'],
+            "venue_id": user['venue_id'],
             "work_area_id": user['work_area_id']
         }
 
@@ -223,7 +260,14 @@ def login():
 
 @auth.route("/auth/verify-token", methods=['POST'])
 def verify_token_route():
-    """Verify token validity and return user data"""
+    """
+    Verify token validity and return user data.
+    
+    Expects the Authorization header in the format:
+       Bearer <token>
+       
+    On success, returns the user data extracted from the token and database.
+    """
     try:
         auth_header = request.headers.get('Authorization')
         if not auth_header:
@@ -232,9 +276,9 @@ def verify_token_route():
         token = auth_header.replace('Bearer ', '')
         payload = verify_token(token)
 
-        # Verify user still exists and is active
+        # Verify that the user still exists and is active
         user = current_app.mongo.db.business_users.find_one({
-            "pay_details.payroll_id": payload['payroll_id'],
+            "payroll_id": payload['payroll_id'],
             "status": {"$ne": "inactive"}
         })
 
@@ -245,12 +289,12 @@ def verify_token_route():
             "success": True,
             "valid": True,
             "user": {
-                "payroll_id": user['pay_details']['payroll_id'],
-                "email_work": user['pay_details']['email_work'],
-                "name_first": user['name_first'],
-                "name_preferred": user.get('name_preferred'),
+                "payroll_id": user['payroll_id'],
+                "email_work": user['work_email'],
+                "name_first": user['first_name'],
+                "name_preferred": user.get('preferred_name'),
                 "role": user['role'],
-                "permissions": user['permissions']
+                "permissions": user.get('permissions', [])
             }
         })
 
@@ -269,13 +313,16 @@ def verify_token_route():
 @auth.route("/auth/logout", methods=['POST'])
 @login_required
 def logout():
-    """Handle user logout with audit logging"""
+    """
+    Handle user logout with audit logging.
+    Requires a valid token via the login_required decorator.
+    """
     try:
-        # Log logout event
+        # Log logout event using data stored in g.user and g.current_user
         AuditLogger.log_event(
             'user_logout',
             g.user['payroll_id'],
-            g.user['business_id'],
+            g.current_user.get('company_id', 'N/A'),
             'User logged out',
             ip_address=request.remote_addr
         )
@@ -297,7 +344,7 @@ def logout():
 # Error handlers
 @auth.errorhandler(AuthError)
 def handle_auth_error(error):
-    """Handle authentication errors"""
+    """Handle authentication errors."""
     return jsonify({
         "success": False,
         "message": error.message
@@ -305,7 +352,7 @@ def handle_auth_error(error):
 
 @auth.errorhandler(Exception)
 def handle_generic_error(error):
-    """Handle generic errors"""
+    """Handle generic errors."""
     logger.error(f"Unexpected error: {str(error)}")
     return jsonify({
         "success": False,
