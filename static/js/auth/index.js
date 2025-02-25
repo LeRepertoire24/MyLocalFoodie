@@ -1,4 +1,6 @@
-// static/js/auth/index.js
+//--------------------------------------//
+//       static/js/auth/index.js        //
+//--------------------------------------//
 
 function closeModal(modalId) {
   const modal = document.getElementById(modalId);
