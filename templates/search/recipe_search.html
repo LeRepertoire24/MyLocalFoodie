@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}Recipe Search{% endblock %}
+
+{% block left_panel %}
+<!-- Left Panel (Sidebar) -->
+<div class="bg-white h-full p-6 font-inter">
+    <div class="text-center mb-6">
+        <!-- New Intro Text Section -->
+        <p class="text-xl font-medium italic">
+            The Le Repertoire Recipe Catalogue, combines a global network with<br>
+            personalized storage for your kitchen.
+        </p>
+        <p class="text-xl font-medium italic mt-2">
+            Discover, Create, Store, Anywhere, Anytime
+        </p>
+        <div class="mt-4 text-gray-700 text-sm">
+            <p>
+                Explore <strong>the Le Repertoire Recipe Catalogue</strong>, a comprehensive collection from the entire Le<br>
+                Repertoire community, offering a diverse range of industry tested recipes to inspire your menu.<br>
+                With endless culinary ideas, you can find exactly what you need to meet your venue<br>
+                requirements and demographic.
+            </p>
+            <p class="mt-4">
+                For your own creations, <strong>My Recipes</strong> allows you to build a personalized recipe library. Save your<br>
+                favorites from the Global Recipes section, or create and store your unique recipes for easy<br>
+                access at any time. Whether you're working with standard dishes or experimenting with new<br>
+                concepts, <strong>My Recipes</strong> ensures your personal collection is always within reach and perfectly<br>
+                organized.
+            </p>
+        </div>
+    </div>
+    <!-- Divider -->
+    <div class="border-t border-gray-300 my-4"></div>
+
+    <!-- Search Section -->
+    <div class="flex flex-col h-full">
+        <h2 class="text-2xl font-bold mb-4 text-center">SEARCH</h2>
+        <div class="flex flex-col space-y-4 items-center">
+            <input id="searchInput" class="w-full max-w-md p-2 border border-gray-300 rounded" placeholder="Search..." type="text">
+            <input id="cuisineInput" class="w-full max-w-md p-2 border border-gray-300 rounded" placeholder="Cuisine..." type="text">
+            <input id="dietaryInput" class="w-full max-w-md p-2 border border-gray-300 rounded" placeholder="Dietary..." type="text">
+            <input id="cookeryMethodInput" class="w-full max-w-md p-2 border border-gray-300 rounded" placeholder="Cookery Method..." type="text">
+            <input id="ingredientInput" class="w-full max-w-md p-2 border border-gray-300 rounded" placeholder="Ingredient..." type="text">
+        </div>
+        <div class="flex justify-center space-x-4 mt-6">
+            <button id="clearFilters" class="bg-gray-300 text-black py-2 px-6 rounded">CANCEL</button>
+            <button id="searchRecipesBtn" class="bg-red-600 text-white py-2 px-6 rounded">SEARCH</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block right_panel %}
+<div class="h-full bg-white p-6 shadow-md rounded-lg">
+    <div class="flex justify-center mb-6">
+        <button id="myRecipesTab" class="tab-button px-4 py-2 border border-gray-300 rounded-l-lg">My Recipes</button>
+        <button id="allRecipesTab" class="tab-button px-4 py-2 border border-gray-300 rounded-r-lg bg-gray-100">All Recipes</button>
+    </div>
+    <div id="myRecipes" class="tab-content hidden">
+        <h2 class="text-2xl font-bold mb-4">My Recipes</h2>
+        <div id="myRecipeGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <!-- Dynamic cards for My Recipes -->
+        </div>
+    </div>
+    <div id="allRecipes" class="tab-content">
+        <h2 class="text-2xl font-bold mb-4">All Recipes</h2>
+        <div id="allRecipeGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <!-- Dynamic cards for All Recipes -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='js/recipe_search.js') }}"></script>
+{% endblock %}
